@@ -1,9 +1,11 @@
-const bitapRegexSearch = require('./bitap_regex_search')
-const bitapSearch = require('./bitap_search')
-const patternAlphabet = require('./bitap_pattern_alphabet')
+/* eslint-disable require-jsdoc */
+/* eslint-disable max-len */
+const bitapRegexSearch = require('./bitap_regex_search');
+const bitapSearch = require('./bitap_search');
+const patternAlphabet = require('./bitap_pattern_alphabet');
 
 class Bitap {
-  constructor (pattern, {
+  constructor(pattern, {
     // Approximately where in the text is the pattern expected to be found?
     location = 0,
     // Determines how close the match must be to the fuzzy location (specified above).
@@ -25,7 +27,7 @@ class Bitap {
     // match is found before the end of the same input.
     findAllMatches = false,
     // Minimum number of characters that must be matched before a result is considered a match
-    minMatchCharLength = 1
+    minMatchCharLength = 1,
   }) {
     this.options = {
       location,
@@ -35,19 +37,19 @@ class Bitap {
       isCaseSensitive,
       tokenSeparator,
       findAllMatches,
-      minMatchCharLength
-    }
+      minMatchCharLength,
+    };
 
-    this.pattern = this.options.isCaseSensitive ? pattern : pattern.toLowerCase()
+    this.pattern = this.options.isCaseSensitive ? pattern : pattern.toLowerCase();
 
     if (this.pattern.length <= maxPatternLength) {
-      this.patternAlphabet = patternAlphabet(this.pattern)
+      this.patternAlphabet = patternAlphabet(this.pattern);
     }
   }
 
-  search (text) {
+  search(text) {
     if (!this.options.isCaseSensitive) {
-      text = text.toLowerCase()
+      text = text.toLowerCase();
     }
 
     // Exact match
@@ -55,25 +57,25 @@ class Bitap {
       return {
         isMatch: true,
         score: 0,
-        matchedIndices: [[0, text.length - 1]]
-      }
+        matchedIndices: [[0, text.length - 1]],
+      };
     }
 
     // When pattern length is greater than the machine word length, just do a a regex comparison
-    const { maxPatternLength, tokenSeparator } = this.options
+    const {maxPatternLength, tokenSeparator} = this.options;
     if (this.pattern.length > maxPatternLength) {
-      return bitapRegexSearch(text, this.pattern, tokenSeparator)
+      return bitapRegexSearch(text, this.pattern, tokenSeparator);
     }
 
     // Otherwise, use Bitap algorithm
-    const { location, distance, threshold, findAllMatches, minMatchCharLength } = this.options
+    const {location, distance, threshold, findAllMatches, minMatchCharLength} = this.options;
     return bitapSearch(text, this.pattern, this.patternAlphabet, {
       location,
       distance,
       threshold,
       findAllMatches,
-      minMatchCharLength
-    })
+      minMatchCharLength,
+    });
   }
 }
 
@@ -81,4 +83,4 @@ class Bitap {
 // let result = x.search("Old Man's War")
 // console.log(result)
 
-module.exports = Bitap
+module.exports = Bitap;
