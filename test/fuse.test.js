@@ -1,10 +1,10 @@
-const Fuse = require('../dist/fuse')
-const books = require('./fixtures/books.json')
-const deepValue = require('../src/helpers/deep_value')
+const Fuse = require('../dist/fuse');
+const books = require('./fixtures/books.json');
+const deepValue = require('../src/helpers/deep_value');
 
-const verbose = false
+const verbose = false;
 
-const defaultList = ['Apple', 'Orange', 'Banana']
+const defaultList = ['Apple', 'Orange', 'Banana'];
 const defaultOptions = {
   location: 0,
   distance: 100,
@@ -24,13 +24,13 @@ const defaultOptions = {
   includeMatches: false,
   includeScore: false,
   verbose
-}
-
+};
+ 
 const setup = (itemList, overwriteOptions) => {
-  const list = itemList || defaultList
-  const options = {...defaultOptions, ...overwriteOptions}
+  const list = itemList || defaultList;
+  const options = {...defaultOptions, ...overwriteOptions};
 
-  return new Fuse(list, options)
+  return new Fuse(list, options);
 }
 
 describe('Flat list of strings: ["Apple", "Orange", "Banana"]', () => {
