@@ -174,6 +174,7 @@ class Fuse {
             obs.complete();
           }
         }
+
         return;
       }
 
@@ -378,11 +379,9 @@ class Fuse {
 
     // take away
     // for (let i = 0, len = results.length; i < len; i += 1) {
-    // const output = results[Object.getOwnPropertyNames(results)[0]].output;
     const output = results.output;
     // const output = results[i].output;
-    const scoreLen = output.length; // remains
-    // const scoreLen = output.length;
+    const scoreLen = output.length;
 
     let currScore = 1;
     let bestScore = 1;
@@ -476,7 +475,6 @@ class Fuse {
 
     // another iteration
     // for (let i = 0, len = results.length; i < len; i += 1) {
-    // console.log({results});
     const result = results;
     // const result = results[i];
 
