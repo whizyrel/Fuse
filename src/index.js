@@ -230,6 +230,7 @@ class Fuse {
           obs.complete();
         }
       }
+
       // return {weights, results};
       return;
     });
