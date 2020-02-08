@@ -15,3 +15,6 @@ package-lock.json
 
 # Filter test runner
 runner.js
+
+test.js
+bible-all.json
