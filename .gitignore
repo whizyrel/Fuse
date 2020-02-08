@@ -17,5 +17,9 @@ package-lock.json
 runner.js
 
 dist
-test-resource/bible-all.json
+test-resource
 test.js
+
+# files irrelevant to npm module
+src
+configs
