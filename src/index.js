@@ -4,6 +4,9 @@ const Bitap = require('./bitap');
 const deepValue = require('./helpers/deep_value');
 const isArray = require('./helpers/is_array');
 
+const {Observable} = require('rxjs');
+const {map} = require('rxjs/operators');
+
 class Fuse {
   constructor(list, {
     // Approximately where in the text is the pattern expected to be found?
@@ -91,19 +94,31 @@ class Fuse {
       fullSearcher,
     } = this._prepareSearchers(pattern);
 
-    let {weights, results} = this._search(tokenSearchers, fullSearcher);
+    // possible observable return point
+    // let {weights, results} = this._search(tokenSearchers, fullSearcher);
+    return this._search(tokenSearchers, fullSearcher)
+        .pipe(
+            map((data) => this._computeScore(data.weights, data.results)),
+            map((data) => this._format(data))
+        );
 
-    this._computeScore(weights, results);
+    // pipe this
+    // this._computeScore(weights, results);
 
-    if (this.options.shouldSort) {
-      this._sort(results);
-    }
+    // another pipe
+    // there's no need to sort one item
+    // if (this.options.shouldSort) {
+    //   this._sort(results);
+    // }
 
-    if (opts.limit && typeof opts.limit === 'number') {
-      results = results.slice(0, opts.limit);
-    }
+    // another pipe
+    // a result cannot be sliced
+    // if (opts.limit && typeof opts.limit === 'number') {
+    //   results = results.slice(0, opts.limit);
+    // }
 
-    return this._format(results);
+    // another pipe
+    // return this._format(results);
   }
 
   _prepareSearchers(pattern = '') {
@@ -123,72 +138,106 @@ class Fuse {
   }
 
   _search(tokenSearchers = [], fullSearcher) {
+    let data;
+    let values;
     const list = this.list;
     const resultMap = {};
-    const results = [];
+    const results = []; // wont be an array no more
 
     // Check the first item in the list, if it's a string, then we assume
     // that every item in the list is also a string, and thus it's a flattened array.
-    if (typeof list[0] === 'string') {
-      // Iterate over every item
-      for (let i = 0, len = list.length; i < len; i += 1) {
-        this._analyze({
-          key: '',
-          value: list[i],
-          record: i,
-          index: i,
-        }, {
-          resultMap,
-          results,
-          tokenSearchers,
-          fullSearcher,
-        });
-      }
-
-      return {weights: null, results};
-    }
-
-    // Otherwise, the first item is an Object (hopefully), and thus the searching
-    // is done on the values of the keys of each item.
-    const weights = {};
-    for (let i = 0, len = list.length; i < len; i += 1) {
-      const item = list[i];
-      // Iterate over every key
-      for (let j = 0, keysLen = this.options.keys.length; j < keysLen; j += 1) {
-        let key = this.options.keys[j];
-        if (typeof key !== 'string') {
-          weights[key.name] = {
-            weight: (1 - key.weight) || 1,
-          };
-          if (key.weight <= 0 || key.weight > 1) {
-            throw new Error('Key weight has to be > 0 and <= 1');
-          }
-          key = key.name;
-        } else {
-          weights[key] = {
-            weight: 1,
-          };
+    return new Observable((obs) => {
+      if (typeof list[0] === 'string') {
+        // Iterate over every item
+        for (let i = 0, len = list.length; i < len; i += 1) {
+          data = this._analyze({
+            key: '',
+            value: list[i],
+            record: i,
+            index: i,
+          }, {
+            resultMap,
+            results,
+            tokenSearchers,
+            fullSearcher,
+          });
         }
 
-        this._analyze({
-          key,
-          value: this.options.getFn(item, key),
-          record: item,
-          index: i,
-        }, {
-          resultMap,
-          results,
-          tokenSearchers,
-          fullSearcher,
-        });
-      }
-    }
+        // case 1
+        // return {weights: null, results};
+        values = Object.values(data);
 
-    return {weights, results};
+        for (let i = 0, len = values.length; i < len; i++) {
+          obs.next({weights: null, results: values[i]});
+
+          if ((i + 1) === len) {
+            obs.complete();
+          }
+        }
+
+        return;
+      }
+
+
+      // Otherwise, the first item is an Object (hopefully), and thus the searching
+      // is done on the values of the keys of each item.
+      const weights = {};
+      for (let i = 0, len = list.length; i < len; i += 1) {
+        const item = list[i];
+
+        // Iterate over every key
+        for (let j = 0, keysLen = this.options.keys.length; j < keysLen; j += 1) {
+          let key = this.options.keys[j];
+
+          // weights block
+          if (typeof key !== 'string') {
+            weights[key.name] = {
+              weight: (1 - key.weight) || 1,
+            };
+
+            if (key.weight <= 0 || key.weight > 1) {
+              throw new Error('Key weight has to be > 0 and <= 1');
+            }
+
+            key = key.name;
+          } else {
+            weights[key] = {
+              weight: 1,
+            };
+          }
+
+          data = this._analyze({
+            key,
+            value: this.options.getFn(item, key),
+            record: item,
+            index: i,
+          }, {
+            resultMap,
+            results,
+            tokenSearchers,
+            fullSearcher,
+          });
+        }
+      }
+
+      // case 2
+      values = Object.values(data);
+
+      for (let i = 0, len = values.length; i < len; i++) {
+        obs.next({weights, results: values[i]});
+
+        if ((i + 1) === len) {
+          obs.complete();
+        }
+      }
+
+      // return {weights, results};
+      return;
+    });
   }
 
   _analyze({key, arrayIndex = -1, value, record, index}, {tokenSearchers = [], fullSearcher = [], resultMap = {}, results = []}) {
-    // Check if the texvaluet can be searched
+    // Check if the textvalue can be searched
     if (value === undefined || value === null) {
       return;
     }
@@ -203,6 +252,7 @@ class Fuse {
       const mainSearchResult = fullSearcher.search(value);
       this._log(`Full text: "${value}", score: ${mainSearchResult.score}`);
 
+      // tokenize section
       if (this.options.tokenize) {
         const words = value.split(this.options.tokenSeparator);
         const scores = [];
@@ -212,13 +262,15 @@ class Fuse {
 
           this._log(`\nPattern: "${tokenSearcher.pattern}"`);
 
-          // let tokenScores = []
+          const tokenScores = [];
           let hasMatchInText = false;
 
           for (let j = 0; j < words.length; j += 1) {
             const word = words[j];
             const tokenSearchResult = tokenSearcher.search(word);
             const obj = {};
+
+            // scores
             if (tokenSearchResult.isMatch) {
               obj[word] = tokenSearchResult.score;
               exists = true;
@@ -226,12 +278,14 @@ class Fuse {
               scores.push(tokenSearchResult.score);
             } else {
               obj[word] = 1;
+
               if (!this.options.matchAllTokens) {
                 scores.push(1);
               }
             }
+
             this._log(`Token: "${word}", score: ${obj[word]}`);
-            // tokenScores.push(obj)
+            tokenScores.push(obj);
           }
 
           if (hasMatchInText) {
@@ -241,15 +295,19 @@ class Fuse {
 
         averageScore = scores[0];
         const scoresLen = scores.length;
+
+        // scores
         for (let i = 1; i < scoresLen; i += 1) {
           averageScore += scores[i];
         }
+
         averageScore = averageScore / scoresLen;
 
         this._log('Token score average:', averageScore);
       }
 
       let finalScore = mainSearchResult.score;
+
       if (averageScore > -1) {
         finalScore = (finalScore + averageScore) / 2;
       }
@@ -264,9 +322,11 @@ class Fuse {
       if ((exists || mainSearchResult.isMatch) && checkTextMatches) {
         // Check if the item already exists in our results
         const existingResult = resultMap[index];
+
         if (existingResult) {
           // Use the lowest score
           // existingResult.score, bitapResult.score
+          // possible problem
           existingResult.output.push({
             key,
             arrayIndex,
@@ -274,6 +334,8 @@ class Fuse {
             score: finalScore,
             matchedIndices: mainSearchResult.matchedIndices,
           });
+
+          console.log('existing result');
         } else {
           // Add it to the raw result list
           resultMap[index] = {
@@ -287,11 +349,14 @@ class Fuse {
             }],
           };
 
-          results.push(resultMap[index]);
+          return resultMap;
+          // results push - avoid push; hot point
+          // results.push(resultMap[index]);
         }
       }
     } else if (isArray(value)) {
       for (let i = 0, len = value.length; i < len; i += 1) {
+        // recursion
         this._analyze({
           key,
           arrayIndex: i,
@@ -306,35 +371,41 @@ class Fuse {
         });
       }
     }
+
+    return resultMap;
   }
 
   _computeScore(weights, results) {
     this._log('\n\nComputing score:\n');
 
-    for (let i = 0, len = results.length; i < len; i += 1) {
-      const output = results[i].output;
-      const scoreLen = output.length;
+    // take away
+    // for (let i = 0, len = results.length; i < len; i += 1) {
+    const output = results.output;
+    // const output = results[i].output;
+    const scoreLen = output.length;
 
-      let currScore = 1;
-      let bestScore = 1;
+    let currScore = 1;
+    let bestScore = 1;
 
-      for (let j = 0; j < scoreLen; j += 1) {
-        const weight = weights ? weights[output[j].key].weight : 1;
-        const score = weight === 1 ? output[j].score : (output[j].score || 0.001);
-        const nScore = score * weight;
+    for (let j = 0; j < scoreLen; j += 1) {
+      const weight = weights ? weights[output[j].key].weight : 1;
+      const score = weight === 1 ? output[j].score : (output[j].score || 0.001);
+      const nScore = score * weight;
 
-        if (weight !== 1) {
-          bestScore = Math.min(bestScore, nScore);
-        } else {
-          output[j].nScore = nScore;
-          currScore *= nScore;
-        }
+      if (weight !== 1) {
+        bestScore = Math.min(bestScore, nScore);
+      } else {
+        output[j].nScore = nScore;
+        currScore *= nScore;
       }
-
-      results[i].score = bestScore === 1 ? currScore : bestScore;
-
-      this._log(results[i]);
     }
+
+    results.score = bestScore === 1 ? currScore : bestScore;
+    // results[i].score = bestScore === 1 ? currScore : bestScore;
+
+    this._log(results);
+    // this._log(results[i]);
+    return results;
   }
 
   _sort(results) {
@@ -343,7 +414,8 @@ class Fuse {
   }
 
   _format(results) {
-    const finalOutput = [];
+    // const finalOutput = [];
+    let finalOutput;
 
     if (this.options.verbose) {
       let cache = [];
@@ -356,8 +428,10 @@ class Fuse {
           // Store value in our collection
           cache.push(value);
         }
+
         return value;
       }));
+
       cache = null;
     }
 
@@ -379,12 +453,16 @@ class Fuse {
             indices: item.matchedIndices,
             value: item.value,
           };
+
           if (item.key) {
             obj.key = item.key;
           }
+
           if (item.hasOwnProperty('arrayIndex') && item.arrayIndex > -1) {
             obj.arrayIndex = item.arrayIndex;
           }
+
+          // my favorite part
           data.matches.push(obj);
         }
       });
@@ -396,28 +474,34 @@ class Fuse {
       });
     }
 
-    for (let i = 0, len = results.length; i < len; i += 1) {
-      const result = results[i];
+    // another iteration
+    // for (let i = 0, len = results.length; i < len; i += 1) {
+    const result = results;
+    // const result = results[i];
 
-      if (this.options.id) {
-        result.item = this.options.getFn(result.item, this.options.id)[0];
-      }
-
-      if (!transformers.length) {
-        finalOutput.push(result.item);
-        continue;
-      }
-
-      const data = {
-        item: result.item,
-      };
-
-      for (let j = 0, len = transformers.length; j < len; j += 1) {
-        transformers[j](result, data);
-      }
-
-      finalOutput.push(data);
+    if (this.options.id) {
+      result.item = this.options.getFn(result.item, this.options.id)[0];
     }
+
+    if (!transformers.length) {
+      finalOutput = result.item;
+      // continue;
+      // possible challenge
+      return finalOutput;
+    }
+
+    const data = {
+      item: result.item,
+    };
+
+    // possible challenge
+    for (let j = 0, len = transformers.length; j < len; j += 1) {
+      transformers[j](result, data);
+    }
+
+    // finalOutput.push(data);
+    finalOutput = data;
+    // }
 
     return finalOutput;
   }
