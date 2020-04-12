@@ -1,0 +1,21 @@
+# Filter node stuff
+node_modules/
+*.log
+
+# Filter MacOS folder store
+.DS_Store
+
+# Filter IDE settings
+.idea/
+.vs/
+.vscode/
+
+# Only publish 1 type of lockfile
+package-lock.json
+
+# Filter test runner
+runner.js
+
+dist/
+test-resource/bible-all.json
+test.js
